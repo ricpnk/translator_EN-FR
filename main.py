@@ -1,4 +1,5 @@
 import torch
+import torch.nn as nn
 import pandas as pd
 from collections import Counter
 from torch.utils.data import DataLoader
@@ -13,8 +14,9 @@ from src.models import Encoder, Decoder, Seq2Seq
 BATCH_SIZE = 32
 EMBEDDING_DIM = 256
 HIDDEN_DIM = 512
+N_DIM = 1
 MAX_LEN = 15
-LR = 0.001
+LEARNRATE = 0.001
 
 
 def main():
@@ -62,11 +64,25 @@ def main():
     )
 
     # todo initiate the Objects for models
-    enc = Encoder()
+    encoder = Encoder(
+        vocab_size=len(vocabulary_en),
+        embedding_dim=EMBEDDING_DIM
+        hidden_dim=HIDDEN_DIM,
+        n_dim=N_DIM
+        dropout=0.1
+    ).to(device)
 
-    dec = Decoder()
+    decoder = Decoder(
+        vocab_size=len(vocabulary_en),
+        embedding_dim=EMBEDDING_DIM
+        hidden_dim=HIDDEN_DIM,
+        n_dim=N_DIM
+        dropout=0.1
+    ).to(device)
 
-    model = Seq2Seq()
+    model = Seq2Seq(encoder, decoder, device).to(device)
+    criterion = nn.CrossEntropyLoss(ignore_index=vocabulary_en.word2idx["<pad>"])
+    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNRATE)
 
 
 
