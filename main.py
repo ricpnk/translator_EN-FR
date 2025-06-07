@@ -168,6 +168,52 @@ def training(model, criterion, optimizer, scheduler, train_loader, test_loader, 
         print(f"Test Loss: {avg_test_loss}")
         print(f"BLEU Score: {bleu_score:.4f}")
 
+        print("-" * 50 + "\n")
+        print("Example translation:")
+        example_sentence = "the cat is on the roof"
+        example_tensor = prepare_sentence(example_sentence, vocabulary_en, MAX_LEN, device)
+        predicted_sentence = greedy_decode(example_tensor, model, vocabulary_en, vocabulary_fr, device)
+        print(f"Input: {example_sentence}")
+        print(f"Predicted: {predicted_sentence}")
+        print("=" * 50 + "\n")
+
+        # Visualize attention
+        if epoch % 5 == 0 and epoch > 0:
+            for idx in range(min(3, len(test_loader.dataset))):
+                src_indices = test_loader.dataset[idx][0].unsqueeze(0).to(device)  # (1, src_len)
+                tgt_indices = test_loader.dataset[idx][1].unsqueeze(0).to(device)  # (1, tgt_len)
+                # Decode mit Attention
+                gen_indices, attn_matrix = greedy_decode_with_attention(
+                    src_indices, model, vocabulary_en, vocabulary_fr, device
+                )
+
+                src_idxs_list = src_indices.squeeze(0).cpu().tolist()
+                tgt_idxs_list = tgt_indices.squeeze(0).cpu().tolist()
+                src_tokens = vocabulary_en.idx_to_sentence(src_idxs_list)
+                tgt_tokens = vocabulary_fr.idx_to_sentence(tgt_idxs_list)
+
+                gen_tokens = vocabulary_fr.idx_to_sentence(gen_indices)
+
+                # Plot Heatmap
+                fig, ax = plt.subplots(figsize=(6, 5))
+                im = ax.imshow(attn_matrix[:len(gen_indices), :len(src_tokens)], 
+                                cmap="viridis", aspect="auto", vmin=0.0, vmax=1.0)
+
+                ax.set_xticks(range(len(src_tokens)))
+                ax.set_xticklabels(src_tokens, rotation=45, ha='right')
+                ax.set_yticks(range(len(gen_tokens)))
+                ax.set_yticklabels(gen_tokens, rotation=0)
+                ax.set_xlabel("Source (EN)")
+                ax.set_ylabel("Generated Target (FR)")
+                ax.set_title(f"Attention for example #{idx}")
+                fig.colorbar(im, ax=ax)
+                plt.tight_layout()
+
+                # Save the figure
+                fig.savefig(f"saved_models/model_{TIMESTAMP}/attention_plots/epoch_{epoch}_example_{idx}.png")
+                plt.close(fig)
+
+
         if bleu_score > best_bleu + 1e-4:
             best_bleu = bleu_score
             epoch_patience = 0
@@ -280,6 +326,72 @@ def greedy_decode(sentence_tensor: torch.Tensor,
     generated_sentence = " ".join(generated_tokens)
     
     return generated_sentence
+
+
+
+
+def prepare_sentence(sentence: str, vocab_src: Vocab, max_len: int, device):
+    tokens = sentence.lower().split()
+    idxs = [vocab_src.word2idx["<sos>"]]
+    for tok in tokens:
+        idxs.append(vocab_src.word2idx.get(tok, vocab_src.word2idx["<unk>"]))
+    idxs.append(vocab_src.word2idx["<eos>"])
+    pad_idx = vocab_src.word2idx["<pad>"]
+    if len(idxs) < max_len:
+        idxs += [pad_idx] * (max_len - len(idxs))
+    else:
+        idxs = idxs[:max_len]
+        if idxs[-1] != vocab_src.word2idx["<eos>"]:
+            idxs[-1] = vocab_src.word2idx["<eos>"]
+    tensor = torch.LongTensor(idxs).unsqueeze(0).to(device)
+    return tensor
+
+
+
+# Helper: Greedy decode with attention weights
+def greedy_decode_with_attention(sentence_tensor: torch.Tensor,
+                                 model: torch.nn.Module,
+                                 vocab_input,
+                                 vocab_output, 
+                                 device,
+                                 max_len=MAX_LEN):
+
+    model.eval()
+    pad_idx = vocab_input.word2idx["<pad>"]
+    src_mask = (sentence_tensor != pad_idx)  # Shape: (1, src_len)
+    with torch.no_grad():
+        enc_outputs, hidden = model.encoder(sentence_tensor)
+
+    sos_idx = vocab_output.word2idx["<sos>"]
+    input_token = torch.LongTensor([sos_idx]).to(device)
+    generated_indices = []
+    all_attn = []
+
+    for _ in range(max_len - 1):
+        with torch.no_grad():
+            prediction, hidden, attn_weights = model.decoder(
+                input_token, hidden, enc_outputs, src_mask
+            )
+        # attn_weights: (1, src_len)
+        all_attn.append(attn_weights.squeeze(0).cpu())
+        top1 = prediction.argmax(1).item()
+        if top1 == vocab_output.word2idx["<eos>"]:
+            break
+        generated_indices.append(top1)
+        input_token = torch.LongTensor([top1]).to(device)
+
+
+    t_steps = len(all_attn)
+    if t_steps < max_len - 1:
+        filler = torch.zeros((max_len - 1 - t_steps, enc_outputs.size(1)))
+        for i in range(filler.size(0)):
+            all_attn.append(filler[i])
+
+
+    all_attn = torch.stack(all_attn, dim=0)
+    return generated_indices, all_attn
+
+
 
 
 
