@@ -25,7 +25,7 @@ class Translation_Data(Dataset):
         )
 
 #! Stop
-def collate(batch, special_idx):
+def collate(batch, special_idx, max_len):
     """
     - takes tensor batches
     - gets max lengths of the input and output tensors
@@ -34,16 +34,12 @@ def collate(batch, special_idx):
     return: all tensors and masks as dictionary
     """
     batch_size = len(batch)
-    input_len_list = [len(input) for input, _ in batch]
-    output_len_list = [len(output) for _, output in batch]
-    max_input_len = max(input_len_list)
-    max_output_len = max(output_len_list)
 
-    input_batch = torch.full((batch_size, max_input_len), special_idx, dtype=torch.long)
-    output_batch = torch.full((batch_size, max_output_len), special_idx, dtype=torch.long)
+    input_batch = torch.full((batch_size, max_len), special_idx, dtype=torch.long)
+    output_batch = torch.full((batch_size, max_len), special_idx, dtype=torch.long)
 
-    input_mask = torch.zeros((batch_size, max_input_len), dtype=torch.bool)
-    output_mask = torch.zeros((batch_size, max_output_len), dtype=torch.bool)
+    input_mask = torch.zeros((batch_size, max_len), dtype=torch.bool)
+    output_mask = torch.zeros((batch_size, max_len), dtype=torch.bool)
 
     for i, (input_seq, output_seq) in enumerate(batch):
             input_len, output_len = len(input_seq), len(output_seq)
