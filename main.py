@@ -110,6 +110,12 @@ def main():
     # Use French vocab's pad token for ignore_index
     criterion = nn.CrossEntropyLoss(ignore_index=vocabulary_fr.word2idx["<pad>"], label_smoothing=0.1)
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARNRATE, weight_decay=3e-5)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer,
+        mode="min",
+        factor=0.5,
+        patience=2
+    )
 
     training(model, criterion, optimizer, scheduler, train_loader, test_loader, device, vocabulary_en, vocabulary_fr)
 
@@ -170,6 +176,9 @@ def training(model, criterion, optimizer, scheduler, train_loader, test_loader, 
             if epoch_patience >= patience:
                 print("Early stopping triggered. No improvement in BLEU score for 5 epochs.")
                 break
+            
+        scheduler.step(avg_test_loss)
+
         # save the checkpoint
         last_checkpoint = {
             "epoch": epoch,
@@ -228,60 +237,45 @@ def evaluation(model, criterion, epoch, test_loader, device,vocabulary_en, vocab
     bleu_score = bleu_results["bleu"]
 
     return avg_test_loss, bleu_score
+
+
 def greedy_decode(sentence_tensor: torch.Tensor,
                   model: torch.nn.Module,
-                  vocab_input,    # Instanz deiner Vocab-Klasse für Englisch
-                  vocab_output,    # Instanz deiner Vocab-Klasse für Französisch
-                  device,
+                  vocab_input,    
+                  vocab_output, 
                   max_len=MAX_LEN):
-    """
-    Übersetzt einen einzelnen EN-Tensor (batch_size=1) per Greedy-Decoding in FR.
 
-    - sentence_tensor: Tensor mit Shape (1, src_len), inkl. <sos> und <eos> und gepaddet auf max_len
-    - model         : Deine Seq2Seq-Instanz (mit Attention). model.eval() sollte aufgerufen sein.
-    - vocab_input     : Vocab-Objekt Englisch (zum PAD-Index und ggf. Token↔Index)
-    - vocab_output     : Vocab-Objekt Französisch
-    - device        : CPU oder GPU
-    - max_len       : dieselbe Konstante, auf die dein Dataloader gepaddet hat
-    """
-
-    # 1) Schalte Modell in Inference-Modus (kein Dropout, kein Teacher Forcing):
     model.eval()
 
-    # 2) Mask & Encoder-Durchlauf
     pad_idx = vocab_input.word2idx["<pad>"]
-    # Maske: True, wo echt, False, wo pad
     src_mask = (sentence_tensor != pad_idx)  # Shape: (1, src_len)
 
     # Encoder: outputs (1, src_len, hid_dim), hidden (n_dim, 1, hid_dim)
     with torch.no_grad():
         enc_outputs, hidden = model.encoder(sentence_tensor)
 
-    # 3) Initialisiere das Decoder-Input mit <sos>
     sos_idx = vocab_output.word2idx["<sos>"]
     input_token = torch.LongTensor([sos_idx]).to(device)  # Shape (1,)
 
     generated_indices = []
 
-    # 4) Schritt-für-Schritt-Decodierung
     for _ in range(max_len - 1):
         with torch.no_grad():
             # prediction: (1, vocab_size), new_hidden: (n_dim, 1, hid_dim)
             prediction, hidden, attn_weights = model.decoder(
                 input_token, hidden, enc_outputs, src_mask
             )
-        # Greedy: größte Wahrscheinlichkeit auswählen
+        # prediction: (1, vocab_size)
         top1 = prediction.argmax(1).item()  # gibt Int
         
-        # Stoppen, wenn <eos> erzeugt wurde
         if top1 == vocab_output.word2idx["<eos>"]:
             break
 
         generated_indices.append(top1)
-        # Next decoder input ist die eben vorhergesagte Klasse
+
         input_token = torch.LongTensor([top1]).to(device)
 
-    # 5) Indizes → Wörter (Strings), ohne Spezial-Tokens
+
     generated_tokens = vocab_output.idx_to_sentence(generated_indices)
     generated_sentence = " ".join(generated_tokens)
     
