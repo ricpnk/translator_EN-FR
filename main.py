@@ -66,6 +66,15 @@ def main():
 
 
 
+    # test the vocab roundtrip
+    print("=== Vocab-Roundtrip Test ===")
+    for sent in train_data["EN"][:5]:
+        idxs    = vocabulary_en.sentence_to_idx(sent)
+        tokens  = vocabulary_en.idx_to_sentence(idxs)
+        print("ORIG:", sent.split())
+        print("RT  :", tokens)
+        print("-"*30)
+
     # todo initiate translator dataset
     train_translator_data = Translation_Data(train_data, vocabulary_en, vocabulary_fr)
     test_translator_data = Translation_Data(test_data, vocabulary_en, vocabulary_fr)
@@ -116,6 +125,12 @@ def main():
         factor=0.5,
         patience=2
     )
+
+    # Shape testing
+    batch = next(iter(train_loader))
+    print("Batch input shape:",  batch["input"].shape)
+    print("Batch output shape:", batch["output"].shape)
+    print("Input mask sum   :", batch["input_mask"][0].sum().item(), "should equal number of real tokens in sentence 0")
 
     training(model, criterion, optimizer, scheduler, train_loader, test_loader, device, vocabulary_en, vocabulary_fr)
 
