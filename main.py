@@ -337,7 +337,7 @@ def visualize_attention(test_loader, model, vocabulary_en, vocabulary_fr, device
         # Plot attention heatmap
         fig, ax = plt.subplots(figsize=(6, 5))
         im = ax.imshow(attn_matrix[:len(output_tokens), :len(input_tokens)],
-                      cmap="viridis", aspect="auto")
+                      cmap="viridis", aspect="auto", vmin=0.0, vmax= 0.3)
 
         ax.set_xticks(range(len(input_tokens)))
         ax.set_xticklabels(input_tokens, rotation=45, ha='right')
