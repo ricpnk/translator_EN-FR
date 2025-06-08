@@ -1,20 +1,21 @@
 from collections import Counter
 
-
 class Vocab:
 
     def __init__(self):
-        self.word2idx = {}
-        self.idx2word = []
-        self.specials = ["<pad>", "<sos>", "<eos>", "<unk>"]
+        self.word2idx = {} 
+        self.idx2word = [] 
+        self.specials = ["<pad>", "<sos>", "<eos>", "<unk>"] 
 
     def __len__(self):
         return len(self.idx2word)
 
     def build(self, counter: Counter):
+        # Add special tokens first
         for spec in self.specials:
             self.add_token(spec)
 
+        # Add vocabulary tokens by frequency
         sorted_tokens = counter.most_common()
         for token, freq in sorted_tokens:
             if token not in self.word2idx:
@@ -26,9 +27,12 @@ class Vocab:
 
     def sentence_to_idx(self, sentence):
         sentence_idx = []
-        sentence_idx.append(self.word2idx["<sos>"])
+        sentence_idx.append(self.word2idx["<sos>"])  # Add start token
+        
+        # Convert each word to its index
         for token in sentence.split():
             sentence_idx.append(self.word2idx.get(token, self.word2idx["<unk>"]))
+            
         sentence_idx.append(self.word2idx["<eos>"])
         return sentence_idx
 
@@ -39,5 +43,4 @@ class Vocab:
             if word in self.specials:
                 continue
             words.append(word)
-
         return words
