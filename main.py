@@ -11,14 +11,16 @@ import evaluate
 import matplotlib.pyplot as plt
 import random
 
+from torch.utils.tensorboard import SummaryWriter
+
 from src.vocab import Vocab
 from src.translation_data import Translation_Data, collate
 from src.models import Encoder, Decoder, Seq2Seq
 
 # Model hyperparameters
 BATCH_SIZE = 256
-EMBEDDING_DIM = 1024
-HIDDEN_DIM = 1024
+EMBEDDING_DIM = 512
+HIDDEN_DIM = 512
 N_DIM = 3
 MAX_LEN = 11
 LEARNRATE = 0.001
@@ -133,17 +135,20 @@ def main():
     print()
 
     # todo Model training
-    training(model, criterion, optimizer, scheduler, train_loader, test_loader, device, vocabulary_en, vocabulary_fr)
+    writer = SummaryWriter(log_dir=f"runs/{TIMESTAMP}")
+    training(model, criterion, optimizer, scheduler, train_loader, test_loader, device, vocabulary_en, vocabulary_fr, writer)
 
     #todo Save the final model
     torch.save(model.state_dict(), f"{MODEL_PATH}/model_{TIMESTAMP}.pth")
     print(f"Model saved to {MODEL_PATH}/model_{TIMESTAMP}.pth")
 
+    writer.close()
+
 
 
 #! Functions for training and evaluation
 
-def training(model, criterion, optimizer, scheduler, train_loader, test_loader, device, vocabulary_en, vocabulary_fr):
+def training(model, criterion, optimizer, scheduler, train_loader, test_loader, device, vocabulary_en, vocabulary_fr, writer):
     model.train()
     best_bleu = 0.0
     epoch_patience = 0
@@ -179,6 +184,10 @@ def training(model, criterion, optimizer, scheduler, train_loader, test_loader, 
         # calculate the average loss for the epoch
         avg_train_loss = epoch_loss / len(train_loader)
         avg_test_loss, bleu_score = evaluation(model, criterion, epoch, test_loader, device, vocabulary_en, vocabulary_fr)
+
+        writer.add_scalar("Loss/train", avg_train_loss, epoch)
+        writer.add_scalar("Loss/test", avg_test_loss, epoch)
+        writer.add_scalar("BLEU", bleu_score, epoch)
 
         # Print results
         print("\n" + "=" * 50)                                  
