@@ -201,7 +201,7 @@ def training(model, criterion, optimizer, scheduler, train_loader, test_loader, 
         print_example_translations(test_loader, model, vocabulary_en, vocabulary_fr, device)
 
         # Visualize attention every 5 epochs
-        if epoch % 5 == 0 and epoch > 0:
+        if epoch % 2 == 0 and epoch > 0:
             visualize_attention(test_loader, model, vocabulary_en, vocabulary_fr, device, epoch)
 
         # Early stopping check
@@ -327,24 +327,25 @@ def print_example_translations(test_loader, model, vocabulary_en, vocabulary_fr,
 
 def visualize_attention(test_loader, model, vocabulary_en, vocabulary_fr, device, epoch):
     for idx in range(min(3, len(test_loader.dataset))):
-        src_indices = test_loader.dataset[idx][0].unsqueeze(0).to(device)
-        gen_indices, attn_matrix = decode(src_indices, model, vocabulary_en, vocabulary_fr, device, return_attention=True)
-
-        src_tokens = vocabulary_en.idx_to_sentence(src_indices.squeeze(0).cpu().tolist())
-        gen_tokens = vocabulary_fr.idx_to_sentence(gen_indices)
+        input_indices = test_loader.dataset[idx][0].unsqueeze(0).to(device)
+        gen_indices, attn_matrix = decode(input_indices, model, vocabulary_en, vocabulary_fr, device, return_attention=True)
+        input_tokens = vocabulary_en.idx_to_sentence(input_indices.squeeze(0).cpu().tolist())
+        output_indices = test_loader.dataset[idx][1]
+        output_tokens = vocabulary_fr.idx_to_sentence(output_indices.tolist())
+        output_tokens = [t for t in output_tokens if t not in ("<pad>", "<sos>", "<eos>", "<unk>")]
 
         # Plot attention heatmap
         fig, ax = plt.subplots(figsize=(6, 5))
-        im = ax.imshow(attn_matrix[:len(gen_indices), :len(src_tokens)], 
-                      cmap="viridis", aspect="auto", vmin=0.0, vmax=1.0)
+        im = ax.imshow(attn_matrix[:len(output_tokens), :len(input_tokens)],
+                      cmap="viridis", aspect="auto")
 
-        ax.set_xticks(range(len(src_tokens)))
-        ax.set_xticklabels(src_tokens, rotation=45, ha='right')
-        ax.set_yticks(range(len(gen_tokens)))
-        ax.set_yticklabels(gen_tokens, rotation=0)
+        ax.set_xticks(range(len(input_tokens)))
+        ax.set_xticklabels(input_tokens, rotation=45, ha='right')
+        ax.set_yticks(range(len(output_tokens)))
+        ax.set_yticklabels(output_tokens, rotation=0)
         ax.set_xlabel("Source (EN)")
-        ax.set_ylabel("Generated Target (FR)")
-        ax.set_title(f"Attention for example #{idx}")
+        ax.set_ylabel("Target (FR)")
+        ax.set_title(f"Attention Heatmap - Epoch {epoch} Example {idx}")
         fig.colorbar(im, ax=ax)
         plt.tight_layout()
 
