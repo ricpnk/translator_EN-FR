@@ -11,21 +11,21 @@ import evaluate
 import matplotlib.pyplot as plt
 import random
 
-from src.Vocab import Vocab
-from src.Translation_Data import Translation_Data, collate
+from src.vocab import Vocab
+from src.translation_data import Translation_Data, collate
 from src.models import Encoder, Decoder, Seq2Seq
 
 # Model hyperparameters
 BATCH_SIZE = 256
-EMBEDDING_DIM = 512
+EMBEDDING_DIM = 1024
 HIDDEN_DIM = 1024
-N_DIM = 2
+N_DIM = 3
 MAX_LEN = 11
 LEARNRATE = 0.001
 TEACHER_RATE = 0.5
-NUM_EPOCHS = 50
+NUM_EPOCHS = 500
 DROP_RATE = 0.5
-PATIENCE = 5
+PATIENCE = 20
 
 TIMESTAMP = datetime.now().strftime("%Y%m%d_%H%M%S")
 MODEL_PATH = f"saved_models/model_{TIMESTAMP}"
@@ -120,7 +120,7 @@ def main():
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer,
         mode="min",
-        factor=0.5,
+        factor=0.2,
         patience=2
     )
 
